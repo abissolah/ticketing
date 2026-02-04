@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Ticketing{% endblock %} | Support</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote-lite.min.css" rel="stylesheet">
+  {% block extra_css %}{% endblock %}
+  <style>
+    :root {
+      --app-primary: #14b8a6;
+      --app-primary-dark: #0d9488;
+      --app-primary-light: #ccfbf1;
+      --app-accent: #f59e0b;
+      --app-bg: #f8fafc;
+      --app-card: #ffffff;
+      --app-radius: 12px;
+      --app-radius-lg: 16px;
+      --app-shadow: 0 1px 3px rgba(0,0,0,.06);
+      --app-shadow-hover: 0 10px 25px -5px rgba(0,0,0,.08), 0 4px 6px -2px rgba(0,0,0,.04);
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--app-bg);
+      color: #334155;
+    }
+    .navbar-app {
+      background: linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-dark) 100%) !important;
+      box-shadow: 0 4px 14px rgba(20, 184, 166, .35);
+      padding: .6rem 0;
+    }
+    .navbar-app .navbar-brand {
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: -0.02em;
+    }
+    .navbar-app .nav-link {
+      font-weight: 500;
+      border-radius: 8px;
+      padding: .4rem .75rem !important;
+      transition: background .2s;
+    }
+    .navbar-app .nav-link:hover {
+      background: rgba(255,255,255,.15);
+    }
+    .navbar-app .dropdown-menu {
+      border: none;
+      box-shadow: var(--app-shadow-hover);
+      border-radius: var(--app-radius);
+      padding: .5rem;
+    }
+    .navbar-app .dropdown-item {
+      border-radius: 8px;
+    }
+    .card-app {
+      background: var(--app-card);
+      border: none;
+      border-radius: var(--app-radius-lg);
+      box-shadow: var(--app-shadow);
+      overflow: hidden;
+    }
+    .btn-app {
+      border-radius: 10px;
+      font-weight: 600;
+      padding: .45rem .9rem;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn-app:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(20, 184, 166, .4);
+    }
+    .btn-app-primary {
+      background: linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-dark) 100%);
+      border: none;
+      color: #fff;
+    }
+    .btn-app-primary:hover {
+      color: #fff;
+      opacity: .95;
+    }
+    .page-header {
+      font-weight: 700;
+      font-size: 1.5rem;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+    }
+    .select2-container--bootstrap-5 .select2-selection { min-height: 38px; border-radius: 8px; }
+    .ticket-row-validated { text-decoration: line-through; opacity: 0.85; }
+    .tile-card { transition: transform .2s ease, box-shadow .2s ease; border-radius: var(--app-radius); }
+    .tile-card:hover { transform: translateY(-4px); box-shadow: var(--app-shadow-hover); }
+    main { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
+    .footer-app {
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+      color: #64748b;
+      font-size: .85rem;
+      padding: .75rem 0;
+    }
+    .fw-600 { font-weight: 600; }
+    .fw-500 { font-weight: 500; }
+    .fw-700 { font-weight: 700; }
+  </style>
+</head>
+<body class="d-flex flex-column min-vh-100">
+  <nav class="navbar navbar-expand-lg navbar-dark navbar-app">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'tickets:home' %}">
+        <i class="bi bi-ticket-perforated-fill fs-5"></i>
+        Ticketing
+      </a>
+      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto gap-1">
+          <li class="nav-item">
+            <a class="nav-link d-flex align-items-center gap-1" href="{% url 'tickets:home' %}"><i class="bi bi-list-ul"></i> Tickets</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link d-flex align-items-center gap-1" href="{% url 'tickets:stats' %}"><i class="bi bi-bar-chart-line"></i> Statistiques</a>
+          </li>
+        </ul>
+        {% if user.is_authenticated %}
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle d-flex align-items-center gap-1" href="#" data-bs-toggle="dropdown">
+              <span class="rounded-circle bg-white bg-opacity-25 d-inline-flex align-items-center justify-content-center" style="width:28px;height:28px;font-size:.8rem">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</span>
+              {{ user.get_full_name|default:user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item d-flex align-items-center gap-2" href="{% url 'tickets:logout' %}"><i class="bi bi-box-arrow-right"></i> Déconnexion</a></li>
+            </ul>
+          </li>
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="container flex-grow-1">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show rounded-3 shadow-sm" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer-app mt-auto">
+    <div class="container"></div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/summernote.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.20/dist/lang/summernote-fr-FR.min.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

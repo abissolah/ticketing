@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Tickets{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <h1 class="page-header mb-0 d-flex align-items-center gap-2">
+      <i class="bi bi-list-task text-primary"></i>
+      Tickets
+    </h1>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <a href="{% url 'tickets:export' %}" class="btn btn-outline-success btn-app btn-sm d-inline-flex align-items-center gap-1">
+        <i class="bi bi-file-earmark-excel"></i> Exporter
+      </a>
+      {% if can_create %}
+        <a href="{% url 'tickets:create' %}" class="btn btn-app btn-app-primary btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-plus-lg"></i> Nouveau ticket
+        </a>
+      {% endif %}
+      <div class="btn-group btn-group-sm shadow-sm rounded-3" role="group">
+        <a href="?{% if query_string_no_view %}{{ query_string_no_view }}&{% endif %}view=table" class="btn btn-outline-secondary {% if view_mode == 'table' %}active{% endif %} d-inline-flex align-items-center gap-1"><i class="bi bi-table"></i> Tableau</a>
+        <a href="?{% if query_string_no_view %}{{ query_string_no_view }}&{% endif %}view=tiles" class="btn btn-outline-secondary {% if view_mode == 'tiles' %}active{% endif %} d-inline-flex align-items-center gap-1"><i class="bi bi-grid-3x3-gap"></i> Tuiles</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-app mb-4">
+    <div class="card-header bg-transparent border-0 py-3 px-4">
+      <button class="btn btn-link text-decoration-none p-0 fw-600 d-flex align-items-center gap-2 text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse">
+        <i class="bi bi-funnel"></i> Filtres
+      </button>
+    </div>
+    <div class="collapse {% if filter.form.has_changed %}show{% endif %}" id="filtersCollapse">
+      <div class="card-body pt-0 px-4 pb-4">
+        <form method="get" class="row g-3">
+          <input type="hidden" name="view" value="{{ view_mode }}">
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Recherche</label>
+            {{ filter.form.search }}
+          </div>
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Statut</label>
+            {{ filter.form.status }}
+          </div>
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Priorité</label>
+            {{ filter.form.priority }}
+          </div>
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Type</label>
+            {{ filter.form.type }}
+          </div>
+          {% if filter.form.member %}
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Membre</label>
+            {{ filter.form.member }}
+          </div>
+          {% endif %}
+          {% if filter.form.assigned_to %}
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Affecté à</label>
+            {{ filter.form.assigned_to }}
+          </div>
+          {% endif %}
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Créé après</label>
+            {{ filter.form.date_after }}
+          </div>
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Créé avant</label>
+            {{ filter.form.date_before }}
+          </div>
+          <div class="col-12 col-lg-2 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-app btn-app-primary btn-sm d-inline-flex align-items-center gap-1"><i class="bi bi-search"></i> Filtrer</button>
+            <a href="{% url 'tickets:home' %}" class="btn btn-outline-secondary btn-sm rounded-3">Réinitialiser</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% if view_mode == 'table' %}
+  <div class="table-responsive rounded-3 overflow-hidden shadow-sm">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="border-0 py-3 ps-4"><span class="text-muted fw-600">Titre</span></th>
+          <th class="border-0 py-3"><span class="text-muted fw-600">Date</span></th>
+          <th class="border-0 py-3"><span class="text-muted fw-600">Membre</span></th>
+          <th class="border-0 py-3"><span class="text-muted fw-600">Priorité</span></th>
+          <th class="border-0 py-3"><span class="text-muted fw-600">Statut</span></th>
+          <th class="border-0 py-3"><span class="text-muted fw-600">Type</span></th>
+          <th class="border-0 py-3 pe-4"><span class="text-muted fw-600">Affecté à</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+        <tr class="{% if ticket.is_validated %}ticket-row-validated{% endif %}">
+          <td style="background-color: {{ ticket.member_color_bg }} !important;" class="ps-4">
+            <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark fw-500 text-decoration-none">{{ ticket.title }}</a>
+          </td>
+          <td style="background-color: {{ ticket.member_color_bg }} !important;">{{ ticket.created_at|date:"d/m/Y H:i" }}</td>
+          <td style="background-color: {{ ticket.member_color_bg }} !important;">
+            <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline form-inline-select">
+              {% csrf_token %}
+              <input type="hidden" name="field" value="member">
+              <select name="value" class="form-select form-select-sm" style="max-width: 140px;" onchange="this.form.submit()">
+                <option value="">—</option>
+                {% for m in ticket.client.members.all %}
+                  <option value="{{ m.pk }}" {% if ticket.member_id == m.pk %}selected{% endif %}>{{ m.first_name }} {{ m.last_name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </td>
+          <td style="background-color: {{ ticket.member_color_bg }} !important;">
+            <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="field" value="priority">
+              <select name="value" class="form-select form-select-sm priority-select" style="max-width: 110px; {{ ticket.priority_select_style }}" onchange="this.form.submit()">
+                <option value="low" {% if ticket.priority == 'low' %}selected{% endif %} style="background-color: #d4edda; color: #155724;">Basse</option>
+                <option value="medium" {% if ticket.priority == 'medium' %}selected{% endif %} style="background-color: #fd7e14; color: #fff;">Moyenne</option>
+                <option value="high" {% if ticket.priority == 'high' %}selected{% endif %} style="background-color: #dc3545; color: #fff;">Haute</option>
+              </select>
+            </form>
+          </td>
+          <td style="background-color: {{ ticket.member_color_bg }} !important;">
+            <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="field" value="status">
+              <select name="value" class="form-select form-select-sm" style="max-width: 150px;" onchange="this.form.submit()">
+                {% for value, label in status_choices %}
+                  <option value="{{ value }}" {% if ticket.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </td>
+          <td style="background-color: {{ ticket.member_color_bg }} !important;">
+            <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="field" value="type">
+              <select name="value" class="form-select form-select-sm" style="max-width: 120px;" onchange="this.form.submit()">
+                <option value="bug" {% if ticket.type == 'bug' %}selected{% endif %}>Bug</option>
+                <option value="evol" {% if ticket.type == 'evol' %}selected{% endif %}>Évolution</option>
+                <option value="exploit" {% if ticket.type == 'exploit' %}selected{% endif %}>Exploitation</option>
+              </select>
+            </form>
+          </td>
+          <td style="background-color: {{ ticket.member_color_bg }} !important;" class="pe-4">
+            {% if assignable_collaborateurs %}
+            <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="field" value="assigned_to">
+              <select name="value" class="form-select form-select-sm" style="max-width: 160px;" onchange="this.form.submit()">
+                <option value="">—</option>
+                {% for c in assignable_collaborateurs %}
+                  <option value="{{ c.pk }}" {% if ticket.assigned_to_id == c.pk %}selected{% endif %}>{{ c.display_name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+            {% else %}
+              {% if ticket.assigned_to %}{{ ticket.assigned_to.display_name }}{% else %}—{% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">Aucun ticket.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="row g-3">
+    {% for ticket in tickets %}
+    <div class="col-12 col-sm-6 col-lg-4">
+      <div class="card card-app tile-card h-100 {% if ticket.is_validated %}ticket-row-validated{% endif %}" style="border-left: 4px solid {{ ticket.member_color }} !important;">
+        <div class="card-body p-4">
+          <h5 class="card-title h6 fw-600 mb-2">
+            <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark text-decoration-none">{{ ticket.title }}</a>
+          </h5>
+          <p class="card-text small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i>{{ ticket.created_at|date:"d/m/Y H:i" }}</p>
+          <div class="d-flex flex-wrap gap-1 mb-2">
+            <span class="badge rounded-pill" style="background-color: {{ ticket.priority_hex }};">{{ ticket.get_priority_display }}</span>
+            <span class="badge rounded-pill bg-secondary">{{ ticket.get_status_display }}</span>
+            <span class="badge rounded-pill bg-light text-dark">{{ ticket.get_type_display }}</span>
+          </div>
+          {% if ticket.assigned_to %}<span class="d-block small text-muted"><i class="bi bi-person me-1"></i>{{ ticket.assigned_to.display_name }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center text-muted py-4">Aucun ticket.</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="mt-4">
+    <ul class="pagination justify-content-center">
+      {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.previous_page_number }}">Précédent</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% if query_string %}{{ query_string }}&{% endif %}page={{ page_obj.next_page_number }}">Suivant</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  <div class="card card-app mt-5">
+    <div class="card-header bg-transparent border-0 py-3 px-4 d-flex align-items-center">
+      <button class="btn btn-link text-decoration-none p-0 fw-600 d-flex align-items-center gap-2 text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#archivedTicketsCollapse" aria-expanded="false">
+        <i class="bi bi-archive"></i> Tickets archivés ({{ archived_tickets|length }})
+      </button>
+    </div>
+    <div class="collapse" id="archivedTicketsCollapse">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle table-sm mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Titre</th>
+                <th>Date</th>
+                <th>Membre</th>
+                <th>Priorité</th>
+                <th>Statut</th>
+                <th>Type</th>
+                <th>Affecté à</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ticket in archived_tickets %}
+              <tr>
+                <td style="background-color: {{ ticket.member_color_bg }} !important;">
+                  <a href="{% url 'tickets:detail' ticket.pk %}">{{ ticket.title }}</a>
+                </td>
+                <td style="background-color: {{ ticket.member_color_bg }} !important;">{{ ticket.created_at|date:"d/m/Y H:i" }}</td>
+                <td style="background-color: {{ ticket.member_color_bg }} !important;">
+                  {% if ticket.member %}{{ ticket.member.first_name }} {{ ticket.member.last_name }}{% else %}—{% endif %}
+                </td>
+                <td style="background-color: {{ ticket.member_color_bg }} !important;">
+                  <span class="badge" style="background-color: {{ ticket.priority_hex }};">{{ ticket.get_priority_display }}</span>
+                </td>
+                <td style="background-color: {{ ticket.member_color_bg }} !important;">{{ ticket.get_status_display }}</td>
+                <td style="background-color: {{ ticket.member_color_bg }} !important;">{{ ticket.get_type_display }}</td>
+                <td style="background-color: {{ ticket.member_color_bg }} !important;">
+                  {% if ticket.assigned_to %}{{ ticket.assigned_to.display_name }}{% else %}—{% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="7" class="text-center text-muted py-3">Aucun ticket archivé.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if archived_tickets|length >= 100 %}
+        <p class="small text-muted px-3 py-2 mb-0">Affichage limité aux 100 derniers tickets archivés.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  $(function () {
+    $('.form-select').addClass('form-control');
+    $('select.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+    $('select.select2-multi').select2({ theme: 'bootstrap-5', width: '100%' });
+  });
+</script>
+{% endblock %}

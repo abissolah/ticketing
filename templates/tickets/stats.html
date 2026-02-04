@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Statistiques{% endblock %}
+
+{% block content %}
+  <h1 class="page-header mb-4 d-flex align-items-center gap-2">
+    <i class="bi bi-bar-chart-line text-primary"></i>
+    Statistiques
+  </h1>
+
+  <div class="card card-app mb-4">
+    <div class="card-header bg-transparent border-0 fw-600 py-3 px-4"><i class="bi bi-funnel me-2"></i>Choisir les statistiques à afficher</div>
+    <div class="card-body px-4 pb-4">
+      <form method="get" class="row g-2 align-items-center">
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="stats" value="open" id="s_open" {% if "open" in stats_choices %}checked{% endif %}>
+            <label class="form-check-label" for="s_open">Tickets ouverts</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="stats" value="closed" id="s_closed" {% if "closed" in stats_choices %}checked{% endif %}>
+            <label class="form-check-label" for="s_closed">Tickets fermés</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="stats" value="by_status" id="s_status" {% if "by_status" in stats_choices %}checked{% endif %}>
+            <label class="form-check-label" for="s_status">Par statut</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="stats" value="by_priority" id="s_priority" {% if "by_priority" in stats_choices %}checked{% endif %}>
+            <label class="form-check-label" for="s_priority">Par priorité</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="stats" value="by_type" id="s_type" {% if "by_type" in stats_choices %}checked{% endif %}>
+            <label class="form-check-label" for="s_type">Par type</label>
+          </div>
+        </div>
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="stats" value="by_assigned" id="s_assigned" {% if "by_assigned" in stats_choices %}checked{% endif %}>
+            <label class="form-check-label" for="s_assigned">Par collaborateur affecté</label>
+          </div>
+        </div>
+        {% if user_client %}
+        <div class="col-auto">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="stats" value="by_member" id="s_by_member" {% if "by_member" in stats_choices %}checked{% endif %}>
+            <label class="form-check-label" for="s_by_member">Par membre</label>
+          </div>
+        </div>
+        {% endif %}
+        <div class="col-auto">
+          <button type="submit" class="btn btn-app btn-app-primary btn-sm d-inline-flex align-items-center gap-1"><i class="bi bi-arrow-clockwise"></i> Actualiser</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    {% if stats.open is not None %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'tickets:home' %}?status=created&status=assigned&status=in_progress&status=delivered_preprod&status=delivered_prod" class="text-decoration-none">
+        <div class="card card-app border-0 border-start border-4 border-primary h-100 hover-shadow">
+          <div class="card-body p-4">
+            <h5 class="card-title text-primary fw-600 d-flex align-items-center gap-2"><i class="bi bi-inbox"></i> Tickets ouverts</h5>
+            <p class="display-6 mb-0">{{ stats.open }}</p>
+            <small class="text-muted">Cliquer pour voir la liste</small>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endif %}
+    {% if stats.closed is not None %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'tickets:home' %}?status=validated&status=archived&status=cancelled" class="text-decoration-none">
+        <div class="card card-app border-0 border-start border-4 border-success h-100 hover-shadow">
+          <div class="card-body p-4">
+            <h5 class="card-title text-success fw-600 d-flex align-items-center gap-2"><i class="bi bi-check2-circle"></i> Tickets fermés</h5>
+            <p class="display-6 mb-0">{{ stats.closed }}</p>
+            <small class="text-muted">Cliquer pour voir la liste</small>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endif %}
+    {% if stats.by_status %}
+    <div class="col-12 col-lg-6">
+      <div class="card card-app">
+        <div class="card-header bg-transparent border-0 fw-600 py-3 px-4"><i class="bi bi-pie-chart me-2"></i>Répartition par statut</div>
+        <div class="card-body px-4 pb-4">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Statut</th><th class="text-end">Nombre</th></tr></thead>
+            <tbody>
+              {% for row in stats.by_status %}
+                <tr>
+                  <td>{% for k, v in status_labels.items %}{% if k == row.status %}{{ v }}{% endif %}{% endfor %}{% if not row.status %}{{ row.status }}{% endif %}</td>
+                  <td class="text-end">{{ row.count }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="row g-4 mt-2">
+    {% if stats.by_priority %}
+    <div class="col-12 col-lg-6">
+      <div class="card card-app">
+        <div class="card-header bg-transparent border-0 fw-600 py-3 px-4"><i class="bi bi-flag me-2"></i>Répartition par priorité</div>
+        <div class="card-body px-4 pb-4">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Priorité</th><th class="text-end">Nombre</th></tr></thead>
+            <tbody>
+              {% for row in stats.by_priority %}
+                <tr>
+                  <td>{% for k, v in priority_labels.items %}{% if k == row.priority %}{{ v }}{% endif %}{% endfor %}</td>
+                  <td class="text-end">{{ row.count }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if stats.by_type %}
+    <div class="col-12 col-lg-6">
+      <div class="card card-app">
+        <div class="card-header bg-transparent border-0 fw-600 py-3 px-4"><i class="bi bi-tags me-2"></i>Répartition par type</div>
+        <div class="card-body px-4 pb-4">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Type</th><th class="text-end">Nombre</th></tr></thead>
+            <tbody>
+              {% for row in stats.by_type %}
+                <tr>
+                  <td>{% for k, v in type_labels.items %}{% if k == row.type %}{{ v }}{% endif %}{% endfor %}</td>
+                  <td class="text-end">{{ row.count }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if stats.by_assigned %}
+    <div class="col-12 col-lg-6">
+      <div class="card card-app">
+        <div class="card-header bg-transparent border-0 fw-600 py-3 px-4"><i class="bi bi-people me-2"></i>Tickets par collaborateur</div>
+        <div class="card-body px-4 pb-4">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Collaborateur</th><th class="text-end">Nombre</th></tr></thead>
+            <tbody>
+              {% for row in stats.by_assigned %}
+                <tr>
+                  <td>{{ row.assigned_to__first_name }} {{ row.assigned_to__last_name }}</td>
+                  <td class="text-end">{{ row.count }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if stats.by_member %}
+    <div class="col-12">
+      <div class="card card-app">
+        <div class="card-header bg-transparent border-0 fw-600 py-3 px-4"><i class="bi bi-person-lines-fill me-2"></i>Par membre</div>
+        <div class="card-body px-4 pb-4">
+          <p class="text-muted small mb-3">Cliquez sur un chiffre pour afficher la liste des tickets correspondants.</p>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Membre</th>
+                  <th class="text-end">Tickets ouverts</th>
+                  <th class="text-end">Tickets fermés</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in stats.by_member %}
+                <tr>
+                  <td>
+                    <span class="d-inline-block rounded-circle me-2" style="width:12px;height:12px;background:{{ row.member.color }};vertical-align:middle" title="{{ row.member.color }}"></span>
+                    {{ row.member.first_name }} {{ row.member.last_name }}
+                  </td>
+                  <td class="text-end">
+                    {% if row.open_count > 0 %}
+                    <a href="{% url 'tickets:home' %}?member={{ row.member.id }}&status=created&status=assigned&status=in_progress&status=delivered_preprod&status=delivered_prod" class="text-primary text-decoration-none fw-600">{{ row.open_count }}</a>
+                    {% else %}
+                    <span class="text-muted">0</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if row.closed_count > 0 %}
+                    <a href="{% url 'tickets:home' %}?member={{ row.member.id }}&status=validated&status=archived&status=cancelled" class="text-success text-decoration-none fw-600">{{ row.closed_count }}</a>
+                    {% else %}
+                    <span class="text-muted">0</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+{% endblock %}

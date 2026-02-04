@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}{% if ticket %}Modifier{% else %}Nouveau ticket{% endif %}{% endblock %}
+
+{% block content %}
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'tickets:home' %}" class="text-decoration-none"><i class="bi bi-list-task me-1"></i>Tickets</a></li>
+      <li class="breadcrumb-item active">{% if ticket %}Modifier #{{ ticket.pk }}{% else %}Nouveau{% endif %}</li>
+    </ol>
+  </nav>
+
+  <h2 class="page-header mb-4 d-flex align-items-center gap-2">
+    <i class="bi bi-{% if ticket %}pencil{% else %}plus-circle{% endif %}"></i>
+    {% if ticket %}Modifier le ticket{% else %}Nouveau ticket{% endif %}
+  </h2>
+
+  <div class="card card-app">
+    <div class="card-body p-4">
+  <form method="post" class="needs-validation" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="row">
+      <div class="col-md-8">
+        <div class="mb-3">
+          <label for="id_title" class="form-label fw-500">Titre</label>
+          <input type="text" name="title" id="id_title" class="form-control rounded-3" value="{{ form.title.value|default:'' }}" required maxlength="300">
+          {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          {{ form.description }}
+          {% if form.description.errors %}<div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="col-md-4">
+        {% if form.client %}
+        <div class="mb-3">
+          <label class="form-label">Client</label>
+          {{ form.client }}
+          {% if form.client.errors %}<div class="invalid-feedback d-block">{{ form.client.errors.0 }}</div>{% endif %}
+        </div>
+        {% endif %}
+        <div class="mb-3">
+          <label class="form-label">Membre initiateur</label>
+          {{ form.member }}
+          {% if form.member.errors %}<div class="invalid-feedback d-block">{{ form.member.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Priorité</label>
+          <select name="priority" id="id_priority" class="form-select select2" style="max-width: 12rem;">
+            <option value="low" {% if form.priority.value == 'low' %}selected{% endif %} style="background-color: #d4edda; color: #155724;">Basse</option>
+            <option value="medium" {% if form.priority.value == 'medium' or not form.priority.value %}selected{% endif %} style="background-color: #fd7e14; color: #fff;">Moyenne</option>
+            <option value="high" {% if form.priority.value == 'high' %}selected{% endif %} style="background-color: #dc3545; color: #fff;">Haute</option>
+          </select>
+          {% if form.priority.errors %}<div class="invalid-feedback d-block">{{ form.priority.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Type</label>
+          {{ form.type }}
+        </div>
+        {% if form.status %}
+        <div class="mb-3">
+          <label class="form-label">Statut</label>
+          {{ form.status }}
+        </div>
+        {% endif %}
+        {% if form.assigned_to %}
+        <div class="mb-3">
+          <label class="form-label">Affecté à</label>
+          {{ form.assigned_to }}
+        </div>
+        {% endif %}
+        {% if form.estimated_time %}
+        <div class="mb-3">
+          <label class="form-label">Temps prévu (jours)</label>
+          {{ form.estimated_time }}
+        </div>
+        {% endif %}
+        {% if form.actual_time %}
+        <div class="mb-3">
+          <label class="form-label">Temps effectif (jours)</label>
+          {{ form.actual_time }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2 mt-4">
+      <button type="submit" class="btn btn-app btn-app-primary d-inline-flex align-items-center gap-1"><i class="bi bi-check-lg"></i> Enregistrer</button>
+      <a href="{% if ticket %}{% url 'tickets:detail' ticket.pk %}{% else %}{% url 'tickets:home' %}{% endif %}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+    </div>
+  </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  var priorityStyles = {
+    low: 'background-color: #d4edda !important; color: #155724 !important;',
+    medium: 'background-color: #fd7e14 !important; color: #fff !important;',
+    high: 'background-color: #dc3545 !important; color: #fff !important;'
+  };
+  function applyPrioritySelectStyle() {
+    var v = $('#id_priority').val() || 'medium';
+    $('#id_priority').attr('style', 'max-width: 12rem; ' + (priorityStyles[v] || priorityStyles.medium));
+  }
+  $(function () {
+    $('.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+    $('.select2-multi').select2({ theme: 'bootstrap-5', width: '100%' });
+    $('#id_priority').on('change', applyPrioritySelectStyle);
+    applyPrioritySelectStyle();
+
+    {% if form.client %}
+    // Remplir la liste des membres quand on choisit un client (création ticket par collaborateur)
+    var membersUrl = "{% url 'tickets:api_client_members' client_id=0 %}";
+    var $memberSelect = $('#id_member');
+    var $clientSelect = $('#id_client');
+
+    $clientSelect.on('change', function () {
+      var clientId = $(this).val();
+      $memberSelect.empty().append('<option value="">—</option>');
+      if ($memberSelect.data('select2')) {
+        $memberSelect.trigger('change.select2');
+      }
+      if (!clientId) return;
+      var url = membersUrl.replace('0', clientId);
+      $.getJSON(url).done(function (data) {
+        $.each(data.members || [], function (i, m) {
+          $memberSelect.append($('<option></option>').val(m.id).text(m.first_name + ' ' + m.last_name));
+        });
+        if ($memberSelect.data('select2')) {
+          $memberSelect.trigger('change.select2');
+        }
+      });
+    });
+    // Charger les membres si un client est déjà sélectionné (après erreur de validation)
+    if ($clientSelect.val()) {
+      $clientSelect.trigger('change');
+    }
+    {% endif %}
+  });
+</script>
+{% endblock %}

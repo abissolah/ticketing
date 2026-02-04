@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ ticket.title }}{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'tickets:home' %}" class="text-decoration-none"><i class="bi bi-list-task me-1"></i>Tickets</a></li>
+        <li class="breadcrumb-item active">#{{ ticket.pk }}</li>
+      </ol>
+    </nav>
+    <a href="{% url 'tickets:edit' ticket.pk %}" class="btn btn-app btn-app-primary btn-sm d-inline-flex align-items-center gap-1"><i class="bi bi-pencil"></i> Modifier</a>
+  </div>
+
+  <div class="card card-app mb-4" style="border-left: 4px solid {{ ticket.member_color }};">
+    <div class="card-header bg-transparent border-0 d-flex flex-wrap align-items-center gap-2 py-4 px-4">
+      <h1 class="h4 mb-0 fw-700 page-header">{{ ticket.title }}</h1>
+      <span class="badge rounded-pill" style="background-color: {{ ticket.priority_hex }};">{{ ticket.get_priority_display }}</span>
+      <span class="badge rounded-pill bg-secondary">{{ ticket.get_status_display }}</span>
+      <span class="badge rounded-pill bg-light text-dark">{{ ticket.get_type_display }}</span>
+      {% if ticket.assigned_to %}
+        <span class="text-muted small ms-1"><i class="bi bi-person me-1"></i>Affecté à {{ ticket.assigned_to.display_name }}</span>
+      {% endif %}
+    </div>
+    <div class="card-body px-4 pb-4">
+      <p class="text-muted small mb-3">
+        <i class="bi bi-building me-1"></i>{{ ticket.client.name }}
+        {% if ticket.member %} — <i class="bi bi-person-circle me-1"></i>{{ ticket.member.first_name }} {{ ticket.member.last_name }}{% endif %}
+        — <i class="bi bi-calendar3 me-1"></i>{{ ticket.created_at|date:"d/m/Y à H:i" }}
+      </p>
+      <div class="mb-4">
+        <h6 class="fw-600 mb-2">Description</h6>
+        <div class="border-0 rounded-3 p-4 bg-light">
+          {% if ticket.description %}
+            {{ ticket.description|safe }}
+          {% else %}
+            <span class="text-muted">Aucune description.</span>
+          {% endif %}
+        </div>
+      </div>
+      {% if description_attachments %}
+      <div class="mb-4">
+        <h6 class="fw-600 mb-2"><i class="bi bi-paperclip me-1"></i>Pièces jointes (description)</h6>
+        <ul class="list-inline mb-0">
+          {% for att in description_attachments %}
+            <li class="list-inline-item"><a href="{{ att.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm rounded-3"><i class="bi bi-download me-1"></i>{{ att.name|default:att.file.name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      {% if ticket.estimated_time or ticket.actual_time %}
+      <div class="row small text-muted">
+        <div class="col">Temps prévu : {{ ticket.estimated_time|default:"—" }} jour(s)</div>
+        <div class="col">Temps effectif : {{ ticket.actual_time|default:"—" }} jour(s)</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <h5 class="mb-3 fw-600 d-flex align-items-center gap-2"><i class="bi bi-chat-dots"></i> Commentaires</h5>
+  <div class="mb-4">
+    {% for comment in ticket.comments.all %}
+    <div class="card card-app mb-2">
+      <div class="card-body py-3 px-4">
+        <p class="mb-1 small text-muted">
+          {{ comment.author.get_full_name|default:comment.author.username }} — {{ comment.created_at|date:"d/m/Y H:i" }}
+        </p>
+        <div class="small">{{ comment.content|safe }}</div>
+        {% for att in comment.attachments.all %}
+          <a href="{{ att.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm mt-1">{{ att.name|default:att.file.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% empty %}
+    <p class="text-muted">Aucun commentaire.</p>
+    {% endfor %}
+  </div>
+
+  <div class="card card-app">
+    <div class="card-header bg-transparent border-0 fw-600 py-3 px-4"><i class="bi bi-reply me-2"></i>Ajouter un commentaire</div>
+    <div class="card-body px-4 pb-4">
+      <form method="post" action="{% url 'tickets:add_comment' ticket.pk %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ comment_form.content }}
+        <div class="mt-3">
+          <label class="form-label small"><i class="bi bi-paperclip me-1"></i>Pièces jointes</label>
+          <input type="file" name="attachments" class="form-control form-control-sm rounded-3" multiple>
+        </div>
+        <button type="submit" class="btn btn-app btn-app-primary mt-3 d-inline-flex align-items-center gap-1"><i class="bi bi-send"></i> Envoyer</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}
