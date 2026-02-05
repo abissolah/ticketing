@@ -6,6 +6,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Charger le fichier .env en production si présent (optionnel)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / ".env")
+except ImportError:
+    pass
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me-in-production")
 
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
@@ -122,3 +129,14 @@ TICKET_PRIORITY_COLORS = {
     "medium": "#fd7e14",
     "high": "#dc3545",
 }
+
+# Réception e-mails → création de tickets
+# IMAP (commande fetch_email_tickets)
+EMAIL_IMAP_HOST = os.environ.get("EMAIL_IMAP_HOST", "")
+EMAIL_IMAP_PORT = int(os.environ.get("EMAIL_IMAP_PORT", "993"))
+EMAIL_IMAP_USER = os.environ.get("EMAIL_IMAP_USER", "")
+EMAIL_IMAP_PASSWORD = os.environ.get("EMAIL_IMAP_PASSWORD", "")
+EMAIL_IMAP_MAILBOX = os.environ.get("EMAIL_IMAP_MAILBOX", "INBOX")
+EMAIL_IMAP_USE_SSL = os.environ.get("EMAIL_IMAP_USE_SSL", "true").lower() in ("true", "1", "yes")
+# Webhook (Mailgun / SendGrid) — secret pour authentifier les POST
+EMAIL_WEBHOOK_SECRET = os.environ.get("EMAIL_WEBHOOK_SECRET", "")

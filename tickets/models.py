@@ -274,3 +274,26 @@ class TicketAttachment(models.Model):
     class Meta:
         verbose_name = "Pièce jointe"
         verbose_name_plural = "Pièces jointes"
+
+
+class InboundEmail(models.Model):
+    """Trace des e-mails entrants déjà traités (évite les doublons)."""
+    message_id = models.CharField("Message-ID", max_length=500, unique=True, db_index=True)
+    ticket = models.ForeignKey(
+        Ticket,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="inbound_emails",
+    )
+    from_email = models.EmailField("Expéditeur")
+    subject = models.CharField("Sujet", max_length=500, blank=True)
+    received_at = models.DateTimeField("Reçu le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "E-mail entrant"
+        verbose_name_plural = "E-mails entrants"
+        ordering = ["-received_at"]
+
+    def __str__(self):
+        return f"{self.from_email} — {self.subject[:50]}"

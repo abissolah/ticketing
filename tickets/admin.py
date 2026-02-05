@@ -10,6 +10,7 @@ from .models import (
     Ticket,
     TicketComment,
     TicketAttachment,
+    InboundEmail,
 )
 
 User = get_user_model()
@@ -121,3 +122,17 @@ class TicketAttachmentAdmin(admin.ModelAdmin):
     list_display = ("name", "ticket", "comment", "uploaded_at")
     raw_id_fields = ("ticket", "comment")
     readonly_fields = ("uploaded_at",)
+
+
+@admin.register(InboundEmail)
+class InboundEmailAdmin(admin.ModelAdmin):
+    list_display = ("from_email", "subject_short", "ticket", "received_at")
+    list_filter = ("received_at",)
+    search_fields = ("from_email", "subject", "message_id")
+    readonly_fields = ("message_id", "from_email", "subject", "ticket", "received_at")
+    raw_id_fields = ("ticket",)
+
+    def subject_short(self, obj):
+        return (obj.subject or "")[:60] + ("..." if len(obj.subject or "") > 60 else "")
+
+    subject_short.short_description = "Sujet"

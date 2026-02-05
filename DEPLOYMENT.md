@@ -192,30 +192,13 @@ Le service systemd (section 12) charge ce fichier via `EnvironmentFile=/var/www/
 
 ---
 
-## 10. Adapter Django pour charger le fichier .env (optionnel)
+## 10. Fichier .env et chargement des variables
 
-Par défaut, Django ne lit pas un fichier `.env`. Deux possibilités :
+Deux possibilités :
 
-- **A)** Exporter les variables dans le service systemd (recommandé, pas de dépendance supplémentaire).  
-- **B)** Utiliser `python-dotenv` et charger `.env` dans `settings.py`.
+- **A) Recommandé en production** : le service systemd charge déjà le `.env` via `EnvironmentFile=/var/www/ticketing/.env` (section 12). Aucune modification de code : Gunicorn reçoit toutes les variables (`DJANGO_SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `DB_*`). Vous n’avez rien à faire de plus.
 
-### Option B (si vous préférez un fichier .env)
-
-```bash
-pip install python-dotenv
-```
-
-Dans `config/settings.py`, en tout début (après les imports existants) :
-
-```python
-from pathlib import Path
-import os
-from dotenv import load_dotenv
-load_dotenv(BASE_DIR / ".env")
-```
-
-Puis laisser `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS` tels qu’ils sont (déjà basés sur `os.environ`).  
-Si vous choisissez l’option B, ajoutez `python-dotenv` dans `requirements.txt`.
+- **B)** Le projet contient déjà dans `config/settings.py` un chargement optionnel du fichier `.env` **après** la définition de `BASE_DIR`. Si `python-dotenv` est installé (`pip install -r requirements.txt` le met en place), le `.env` est chargé automatiquement. **Ne pas ajouter** `load_dotenv(BASE_DIR / ".env")` en tête de fichier : cela provoquerait une erreur `NameError: name 'BASE_DIR' is not defined`, car `BASE_DIR` doit être défini avant d’être utilisé.
 
 ---
 
@@ -331,7 +314,97 @@ nginx -t
 systemctl reload nginx
 ```
 
+**Important :** si un site par défaut existe (souvent sur Ubuntu), il peut répondre à la place du vôtre et renvoyer une **404**. Désactivez-le avant de tester :
+
+```bash
+sudo rm /etc/nginx/sites-enabled/default
+nginx -t
+sudo systemctl reload nginx
+```
+
 À ce stade, le site doit répondre en **HTTP** sur `http://ticketing.votredomaine.com`. Vérifier que la page de login s’affiche.
+
+---
+
+
+### En cas de 404
+
+1. **Ne garder qu’un seul site sur le port 80** : si `default` et `ticketing` sont tous les deux dans `sites-enabled`, Nginx utilise souvent `default` et renvoie 404. Supprimez le lien vers le site par défaut : `sudo rm /etc/nginx/sites-enabled/default`, puis `sudo nginx -t` et `sudo systemctl reload nginx`.
+
+2. **Accéder par le nom de domaine** (pas par l'IP) : ouvrir `http://ticketing.votredomaine.com` (ou votre domaine exact). Si vous ouvrez `http://IP_DU_SERVEUR`, Nginx peut utiliser un autre `server` et renvoyer 404.
+
+3. **Vérifier que Gunicorn tourne et que le socket existe :**
+   ```bash
+   sudo systemctl status ticketing
+   ls -la /var/www/ticketing/gunicorn.sock
+   ```
+   Si le socket n'existe pas à cet endroit, Gunicorn le crée peut-être ailleurs (par ex. si votre projet est dans `/var/www/tickets/ticketing`). Trouver le socket :
+   ```bash
+   sudo find /var/www -name "gunicorn.sock" 2>/dev/null
+   ```
+   Le chemin dans `--bind unix:...` (service systemd) et dans `proxy_pass` (Nginx) doit être **exactement le même**. Si vous avez déployé dans `/var/www/tickets/ticketing`, mettez le socket et Nginx sur ce répertoire (voir point 3).
+   Si le service est en erreur : `sudo journalctl -u ticketing -n 80`.
+
+4. **Adapter les chemins si le projet est ailleurs** : si vous avez cloné dans `/var/www/tickets/ticketing` (et non `/var/www/ticketing`), tous les chemins dans la config Nginx et dans le service systemd doivent utiliser ce répertoire (ex. `proxy_pass http://unix:/var/www/tickets/ticketing/gunicorn.sock;`, `alias /var/www/tickets/ticketing/staticfiles/;`, etc.).
+
+5. **Vérifier les logs Nginx :**
+   ```bash
+   sudo tail -50 /var/log/nginx/error.log
+   ```
+
+6. **Tester que Django répond en local** (en SSH sur le serveur) :
+   ```bash
+   cd /var/www/ticketing
+   source .venv/bin/activate
+   export $(grep -v '^#' .env | xargs)
+   python manage.py runserver 0.0.0.0:8000
+   ```
+   Puis ouvrir `http://IP_DU_SERVEUR:8000` dans le navigateur. Si la page de login s'affiche, le souci vient de Nginx ou du socket Gunicorn.
+
+### Diagnostic pas à pas (404 qui persiste)
+
+Exécuter ces commandes **sur le serveur en SSH** et noter les sorties. Elles permettent de savoir si la 404 vient de Nginx ou de Django.
+
+**A. Où est le socket Gunicorn ?**
+```bash
+sudo find /var/www -name "gunicorn.sock" 2>/dev/null
+```
+Si rien n’apparaît, Gunicorn ne crée pas le socket (vérifier `journalctl -u ticketing -n 50`). Si un chemin s’affiche (ex. `/var/www/tickets/ticketing/gunicorn.sock`), c’est celui à utiliser partout.
+
+**B. Tester Django sans Nginx (remplacer le chemin par celui trouvé en A) :**
+```bash
+curl -sS -o /dev/null -w "HTTP %{http_code}\n" --unix-socket /var/www/tickets/ticketing/gunicorn.sock http://localhost/
+```
+- Si vous voyez **HTTP 200** : Django répond correctement, le problème vient de la **config Nginx** (mauvais chemin du socket ou mauvais `server_name`).
+- Si **HTTP 400** : le `Host` envoyé est `localhost` ; Django refuse car il n'est pas dans `ALLOWED_HOSTS`. Ajoutez `localhost,127.0.0.1` dans le `.env` (et gardez votre domaine), redémarrez Gunicorn, puis refaites le test.
+- Si **HTTP 404** : la requête atteint Django mais une URL ou la config Django pose problème.
+- Si **Connection refused** ou erreur : le socket n’est pas le bon ou Gunicorn n’écoute pas dessus.
+
+**C. Vérifier que Nginx utilise le bon socket :**
+```bash
+grep proxy_pass /etc/nginx/sites-available/ticketing
+```
+Le chemin après `unix:` doit être **strictement identique** à celui trouvé en A (ex. `unix:/var/www/tickets/ticketing/gunicorn.sock`).
+
+**D. Vérifier le service systemd :**
+```bash
+grep -E "WorkingDirectory|bind" /etc/systemd/system/ticketing.service
+```
+`WorkingDirectory` doit être le répertoire du projet. Le chemin dans `--bind unix:...` doit être le même que dans Nginx.
+
+**E. Tester avec le nom de domaine (depuis le serveur) :**
+```bash
+curl -v -H "Host: VOTRE_DOMAINE" http://127.0.0.1/
+```
+Remplacer `VOTRE_DOMAINE` par votre domaine (ex. `ticketing.example.com`). Regarder le code HTTP et les en-têtes de la réponse.
+
+**F. ALLOWED_HOSTS :** le fichier `.env` du projet doit contenir votre domaine, par ex. :
+```env
+ALLOWED_HOSTS=ticketing.example.com,www.ticketing.example.com
+```
+Sans le bon `Host`, Django peut renvoyer 400 ou un comportement inattendu.
+
+**Résumé :** après A et B, si Django renvoie 200 en direct sur le socket mais le navigateur affiche 404, corriger la config Nginx (C) et le chemin du socket dans le service (D), puis `sudo systemctl restart ticketing` et `sudo systemctl reload nginx`.
 
 ---
 

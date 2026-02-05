@@ -15,4 +15,5 @@ urlpatterns = [
     path("ticket/<int:pk>/quick-update/", views.ticket_quick_update, name="quick_update"),
     path("ticket/<int:pk>/comment/", views.ticket_add_comment, name="add_comment"),
     path("api/client/<int:client_id>/members/", views.api_client_members, name="api_client_members"),
+    path("webhook/inbound-email/", views.webhook_inbound_email, name="webhook_inbound_email"),
 ]

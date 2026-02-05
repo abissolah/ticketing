@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -8,6 +9,8 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.views.generic import CreateView, DetailView, UpdateView, ListView
 from django_filters.views import FilterView
 import openpyxl
@@ -216,7 +219,12 @@ class TicketCreateView(LoginRequiredMixin, CreateView):
                     form.instance.member = members.first()
         form.instance.created_by = self.request.user
         form.instance.status = "created"
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        for f in self.request.FILES.getlist("attachments"):
+            TicketAttachment.objects.create(
+                ticket=self.object, comment=None, file=f, name=f.name or "piece_jointe"
+            )
+        return response
 
     def get_success_url(self):
         return reverse_lazy("tickets:detail", kwargs={"pk": self.object.pk})
@@ -237,6 +245,14 @@ class TicketUpdateView(LoginRequiredMixin, UpdateView):
         kwargs["client"] = get_user_client(self.request.user)
         kwargs["collaborateur"] = get_user_collaborateur(self.request.user)
         return kwargs
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        for f in self.request.FILES.getlist("attachments"):
+            TicketAttachment.objects.create(
+                ticket=self.object, comment=None, file=f, name=f.name or "piece_jointe"
+            )
+        return response
 
     def get_success_url(self):
         return reverse_lazy("tickets:detail", kwargs={"pk": self.object.pk})
@@ -412,3 +428,44 @@ class StatsView(LoginRequiredMixin, View):
             "type_labels": type_labels,
             "user_client": client,
         })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def webhook_inbound_email(request):
+    """
+    Webhook pour réception d'e-mails (Mailgun, SendGrid, etc.).
+    Corps POST : sender, subject, body-plain (ou body_plain), Message-Id (optionnel).
+    Sécurisé par EMAIL_WEBHOOK_SECRET (paramètre token ou header X-Webhook-Token).
+    """
+    secret = getattr(settings, "EMAIL_WEBHOOK_SECRET", None)
+    if secret:
+        token = request.POST.get("token") or request.headers.get("X-Webhook-Token")
+        if token != secret:
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    # Mailgun: sender, subject, body-plain, Message-Id, pièces jointes (attachment-1, attachment-2, ...)
+    from_email = request.POST.get("sender") or request.POST.get("From") or ""
+    subject = request.POST.get("subject") or request.POST.get("Subject") or ""
+    body = request.POST.get("body-plain") or request.POST.get("body_plain") or request.POST.get("stripped-text") or ""
+    message_id = request.POST.get("Message-Id") or request.POST.get("Message-ID") or ""
+
+    attachments = []
+    for f in list(request.FILES.values())[:20]:  # max 20 PJ (aligné email_receiver)
+        try:
+            attachments.append((f.name or "piece_jointe", f.read()))
+        except Exception:
+            pass
+
+    from .email_receiver import create_ticket_from_email
+
+    ticket, err = create_ticket_from_email(
+        from_email.strip(),
+        subject,
+        body,
+        message_id=message_id.strip() or None,
+        attachments=attachments if attachments else None,
+    )
+    if ticket:
+        return JsonResponse({"ok": True, "ticket_id": ticket.id})
+    return JsonResponse({"ok": False, "error": err or "Unknown"}, status=400)
