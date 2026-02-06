@@ -67,6 +67,14 @@
           {{ form.status }}
         </div>
         {% endif %}
+        {% if form.archived %}
+        <div class="mb-3">
+          <div class="form-check">
+            {{ form.archived }}
+            <label class="form-check-label" for="id_archived">Archivé</label>
+          </div>
+        </div>
+        {% endif %}
         {% if form.assigned_to %}
         <div class="mb-3">
           <label class="form-label">Affecté à</label>

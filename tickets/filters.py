@@ -12,6 +12,15 @@ class TicketFilter(django_filters.FilterSet):
         widget=forms.SelectMultiple(attrs={"class": SELECT_CLASS + " select2-multi"}),
         label="Statut",
     )
+    archived = django_filters.BooleanFilter(
+        field_name="archived",
+        label="Archivé",
+        widget=forms.Select(
+            attrs={"class": SELECT_CLASS},
+            choices=[("", "—"), ("false", "Non archivés"), ("true", "Archivés")],
+        ),
+        method="filter_archived",
+    )
     priority = django_filters.MultipleChoiceFilter(
         choices=PRIORITY_CHOICES,
         widget=forms.SelectMultiple(attrs={"class": SELECT_CLASS + " select2-multi"}),
@@ -52,6 +61,15 @@ class TicketFilter(django_filters.FilterSet):
         label="Recherche (titre)",
         widget=forms.TextInput(attrs={"class": INPUT_CLASS, "placeholder": "Titre..."}),
     )
+
+    def filter_archived(self, queryset, name, value):
+        if value is None or value == "":
+            return queryset
+        if value in (True, "true", "1", "True"):
+            return queryset.filter(archived=True)
+        if value in (False, "false", "0", "False"):
+            return queryset.filter(archived=False)
+        return queryset
 
     def __init__(self, *args, **kwargs):
         self.client_ids = kwargs.pop("client_ids", None)

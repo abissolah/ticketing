@@ -79,7 +79,7 @@
     {% endif %}
     {% if stats.closed is not None %}
     <div class="col-12 col-md-6 col-lg-4">
-      <a href="{% url 'tickets:home' %}?status=validated&status=archived&status=cancelled" class="text-decoration-none">
+      <a href="{% url 'tickets:home' %}?status=validated&status=cancelled" class="text-decoration-none">
         <div class="card card-app border-0 border-start border-4 border-success h-100 hover-shadow">
           <div class="card-body p-4">
             <h5 class="card-title text-success fw-600 d-flex align-items-center gap-2"><i class="bi bi-check2-circle"></i> Tickets fermés</h5>
@@ -204,7 +204,7 @@
                   </td>
                   <td class="text-end">
                     {% if row.closed_count > 0 %}
-                    <a href="{% url 'tickets:home' %}?member={{ row.member.id }}&status=validated&status=archived&status=cancelled" class="text-success text-decoration-none fw-600">{{ row.closed_count }}</a>
+                    <a href="{% url 'tickets:home' %}?member={{ row.member.id }}&status=validated&status=cancelled" class="text-success text-decoration-none fw-600">{{ row.closed_count }}</a>
                     {% else %}
                     <span class="text-muted">0</span>
                     {% endif %}

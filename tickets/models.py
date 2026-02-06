@@ -105,7 +105,6 @@ STATUS_CHOICES = [
     ("delivered_preprod", "Livré préprod"),
     ("delivered_prod", "Livré prod"),
     ("validated", "Validé"),
-    ("archived", "Archivé"),
     ("cancelled", "Annulé"),
 ]
 
@@ -136,6 +135,13 @@ class Ticket(models.Model):
     status = models.CharField(
         "Statut", max_length=30, choices=STATUS_CHOICES, default="created"
     )
+    validated_at = models.DateTimeField(
+        "Date de validation",
+        null=True,
+        blank=True,
+        help_text="Renseigné automatiquement lorsque le statut passe à Validé.",
+    )
+    archived = models.BooleanField("Archivé", default=False)
     type = models.CharField(
         "Type", max_length=20, choices=TYPE_CHOICES, default="bug"
     )
@@ -186,7 +192,7 @@ class Ticket(models.Model):
 
     @property
     def is_archived(self):
-        return self.status == "archived"
+        return self.archived
 
     @property
     def member_color(self):
@@ -247,6 +253,34 @@ class TicketComment(models.Model):
 
     def __str__(self):
         return f"Commentaire #{self.ticket_id} par {self.author}"
+
+
+class CommentReadReceipt(models.Model):
+    """Marque qu'un utilisateur a lu un commentaire (pour la pastille "non lus")."""
+    comment = models.ForeignKey(
+        TicketComment,
+        on_delete=models.CASCADE,
+        related_name="read_receipts",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comment_read_receipts",
+    )
+    read_at = models.DateTimeField("Lu le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Lecture d'un commentaire"
+        verbose_name_plural = "Lectures des commentaires"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["comment", "user"],
+                name="tickets_commentreadreceipt_comment_user_unique",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Lu par {self.user}"
 
 
 def ticket_attachment_upload_to(instance, filename):

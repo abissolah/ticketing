@@ -10,6 +10,7 @@ from .models import (
     Ticket,
     TicketComment,
     TicketAttachment,
+    CommentReadReceipt,
     InboundEmail,
 )
 
@@ -96,15 +97,17 @@ class TicketAdmin(admin.ModelAdmin):
         "member",
         "priority",
         "status",
+        "validated_at",
+        "archived",
         "type",
         "assigned_to",
         "created_at",
     )
-    list_filter = ("status", "priority", "type", "client")
+    list_filter = ("status", "archived", "priority", "type", "client")
     search_fields = ("title", "description")
     raw_id_fields = ("created_by", "assigned_to")
     autocomplete_fields = ("client", "member")
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "validated_at")
     inlines = [TicketCommentInline, TicketAttachmentInline]
     date_hierarchy = "created_at"
 
@@ -113,8 +116,14 @@ class TicketAdmin(admin.ModelAdmin):
 class TicketCommentAdmin(admin.ModelAdmin):
     list_display = ("ticket", "author", "created_at")
     list_filter = ("ticket__client",)
-    raw_id_fields = ("ticket", "author")
-    readonly_fields = ("created_at",)
+
+
+@admin.register(CommentReadReceipt)
+class CommentReadReceiptAdmin(admin.ModelAdmin):
+    list_display = ("comment", "user", "read_at")
+    list_filter = ("read_at",)
+    raw_id_fields = ("comment", "user")
+    readonly_fields = ("read_at",)
 
 
 @admin.register(TicketAttachment)

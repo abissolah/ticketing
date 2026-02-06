@@ -14,6 +14,15 @@
     <a href="{% url 'tickets:edit' ticket.pk %}" class="btn btn-app btn-app-primary btn-sm d-inline-flex align-items-center gap-1"><i class="bi bi-pencil"></i> Modifier</a>
   </div>
 
+  {% if ticket.is_validated %}
+  <div class="alert alert-success d-flex align-items-center gap-3 mb-4 rounded-3 shadow-sm border-0" role="status">
+    <span class="fs-3"><i class="bi bi-patch-check-fill text-success"></i></span>
+    <div class="flex-grow-1">
+      <strong>Ce ticket a été validé</strong>{% if ticket.validated_at %} le {{ ticket.validated_at|date:"d/m/Y à H:i" }}{% endif %}.
+    </div>
+  </div>
+  {% endif %}
+
   <div class="card card-app mb-4" style="border-left: 4px solid {{ ticket.member_color }};">
     <div class="card-header bg-transparent border-0 d-flex flex-wrap align-items-center gap-2 py-4 px-4">
       <h1 class="h4 mb-0 fw-700 page-header">{{ ticket.title }}</h1>
@@ -60,16 +69,22 @@
   </div>
 
   <h5 class="mb-3 fw-600 d-flex align-items-center gap-2"><i class="bi bi-chat-dots"></i> Commentaires</h5>
-  <div class="mb-4">
+  <div class="chat-thread mb-4">
     {% for comment in ticket.comments.all %}
-    <div class="card card-app mb-2">
-      <div class="card-body py-3 px-4">
-        <p class="mb-1 small text-muted">
-          {{ comment.author.get_full_name|default:comment.author.username }} — {{ comment.created_at|date:"d/m/Y H:i" }}
+    <div class="chat-row chat-row-{% if comment.id in sent_comment_ids %}sent{% else %}received{% endif %}">
+      <div class="chat-bubble {% if comment.id in newly_read_comment_ids %}comment-newly-read{% endif %}">
+        <p class="chat-meta mb-1 small text-muted d-flex align-items-center gap-2 flex-wrap">
+          {% if comment.id in sent_comment_ids %}
+            <span>Vous</span>
+          {% else %}
+            <span>{{ comment.author.get_full_name|default:comment.author.username }}</span>
+          {% endif %}
+          <span>{{ comment.created_at|date:"d/m/Y H:i" }}</span>
+          {% if comment.id in newly_read_comment_ids %}<span class="badge rounded-pill bg-primary badge-newly-read">Nouveau</span>{% endif %}
         </p>
-        <div class="small">{{ comment.content|safe }}</div>
+        <div class="chat-body small">{{ comment.content|safe }}</div>
         {% for att in comment.attachments.all %}
-          <a href="{{ att.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm mt-1">{{ att.name|default:att.file.name }}</a>
+          <a href="{{ att.file.url }}" target="_blank" class="btn btn-outline-secondary btn-sm mt-1"><i class="bi bi-paperclip me-1"></i>{{ att.name|default:att.file.name }}</a>
         {% endfor %}
       </div>
     </div>

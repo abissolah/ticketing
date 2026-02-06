@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize ticket_extras %}
 
 {% block title %}Tickets{% endblock %}
 
@@ -42,6 +42,10 @@
           <div class="col-12 col-md-6 col-lg-2">
             <label class="form-label small">Statut</label>
             {{ filter.form.status }}
+          </div>
+          <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label small">Archivé</label>
+            {{ filter.form.archived }}
           </div>
           <div class="col-12 col-md-6 col-lg-2">
             <label class="form-label small">Priorité</label>
@@ -91,7 +95,8 @@
           <th class="border-0 py-3"><span class="text-muted fw-600">Priorité</span></th>
           <th class="border-0 py-3"><span class="text-muted fw-600">Statut</span></th>
           <th class="border-0 py-3"><span class="text-muted fw-600">Type</span></th>
-          <th class="border-0 py-3 pe-4"><span class="text-muted fw-600">Affecté à</span></th>
+          <th class="border-0 py-3"><span class="text-muted fw-600">Affecté à</span></th>
+          <th class="border-0 py-3 pe-4 text-end" style="width: 100px;"><span class="text-muted fw-600">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -99,7 +104,10 @@
         <tr class="{% if ticket.is_validated %}ticket-row-validated{% endif %}">
           <td style="background-color: {{ ticket.member_color_bg }} !important;" class="ps-4">
             <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark fw-500 text-decoration-none">{{ ticket.title }}</a>
-          </td>
+            {% if ticket.is_validated and ticket.validated_at %}<span class="badge rounded-pill bg-success ms-1" title="Date de validation"><i class="bi bi-check-circle-fill me-1"></i>Validé le {{ ticket.validated_at|date:"d/m/Y" }}</span>{% endif %}
+            {% with unread=ticket_unread_counts|get_item:ticket.id %}
+            {% if unread %}<span class="badge rounded-pill bg-danger ms-1 badge-unread-comments" title="Commentaires non lus">{{ unread }}</span>{% endif %}
+            {% endwith %}
           <td style="background-color: {{ ticket.member_color_bg }} !important;">{{ ticket.created_at|date:"d/m/Y H:i" }}</td>
           <td style="background-color: {{ ticket.member_color_bg }} !important;">
             <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline form-inline-select">
@@ -146,7 +154,7 @@
               </select>
             </form>
           </td>
-          <td style="background-color: {{ ticket.member_color_bg }} !important;" class="pe-4">
+          <td style="background-color: {{ ticket.member_color_bg }} !important;">
             {% if assignable_collaborateurs %}
             <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline">
               {% csrf_token %}
@@ -162,9 +170,19 @@
               {% if ticket.assigned_to %}{{ ticket.assigned_to.display_name }}{% else %}—{% endif %}
             {% endif %}
           </td>
+          <td style="background-color: {{ ticket.member_color_bg }} !important;" class="pe-4 text-end">
+            <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="field" value="archived">
+              <input type="hidden" name="value" value="{% if ticket.archived %}false{% else %}true{% endif %}">
+              <button type="submit" class="btn btn-outline-secondary btn-sm rounded-3 d-inline-flex align-items-center gap-1" title="{% if ticket.archived %}Désarchiver{% else %}Archiver{% endif %}">
+                <i class="bi bi-archive"></i> {% if ticket.archived %}Désarchiver{% else %}Archiver{% endif %}
+              </button>
+            </form>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted py-4">Aucun ticket.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">Aucun ticket.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -177,14 +195,26 @@
         <div class="card-body p-4">
           <h5 class="card-title h6 fw-600 mb-2">
             <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark text-decoration-none">{{ ticket.title }}</a>
+            {% with unread=ticket_unread_counts|get_item:ticket.id %}
+            {% if unread %}<span class="badge rounded-pill bg-danger ms-1 badge-unread-comments" title="Commentaires non lus">{{ unread }}</span>{% endif %}
+            {% endwith %}
           </h5>
           <p class="card-text small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i>{{ ticket.created_at|date:"d/m/Y H:i" }}</p>
           <div class="d-flex flex-wrap gap-1 mb-2">
             <span class="badge rounded-pill" style="background-color: {{ ticket.priority_hex }};">{{ ticket.get_priority_display }}</span>
             <span class="badge rounded-pill bg-secondary">{{ ticket.get_status_display }}</span>
+            {% if ticket.is_validated and ticket.validated_at %}<span class="badge rounded-pill bg-success"><i class="bi bi-check-circle me-1"></i>Validé le {{ ticket.validated_at|date:"d/m/Y" }}</span>{% endif %}
             <span class="badge rounded-pill bg-light text-dark">{{ ticket.get_type_display }}</span>
           </div>
-          {% if ticket.assigned_to %}<span class="d-block small text-muted"><i class="bi bi-person me-1"></i>{{ ticket.assigned_to.display_name }}</span>{% endif %}
+          {% if ticket.assigned_to %}<span class="d-block small text-muted mb-2"><i class="bi bi-person me-1"></i>{{ ticket.assigned_to.display_name }}</span>{% endif %}
+          <form method="post" action="{% url 'tickets:quick_update' ticket.pk %}" class="mt-2">
+            {% csrf_token %}
+            <input type="hidden" name="field" value="archived">
+            <input type="hidden" name="value" value="{% if ticket.archived %}false{% else %}true{% endif %}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm rounded-3 w-100 d-inline-flex align-items-center justify-content-center gap-1">
+              <i class="bi bi-archive"></i> {% if ticket.archived %}Désarchiver{% else %}Archiver{% endif %}
+            </button>
+          </form>
         </div>
       </div>
     </div>

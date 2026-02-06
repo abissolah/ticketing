@@ -92,7 +92,10 @@
       color: #0f172a;
     }
     .select2-container--bootstrap-5 .select2-selection { min-height: 38px; border-radius: 8px; }
-    .ticket-row-validated { text-decoration: line-through; opacity: 0.85; }
+    .ticket-row-validated { text-decoration: line-through; opacity: 0.9; border-left: 3px solid #198754 !important; }
+    .ticket-row-validated td { background-color: rgba(25, 135, 84, 0.06) !important; }
+    .tile-card.ticket-row-validated { border-left-width: 4px !important; border-left-color: #198754 !important; }
+    .tile-card.ticket-row-validated .card-body { background-color: rgba(25, 135, 84, 0.04); }
     .tile-card { transition: transform .2s ease, box-shadow .2s ease; border-radius: var(--app-radius); }
     .tile-card:hover { transform: translateY(-4px); box-shadow: var(--app-shadow-hover); }
     main { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
@@ -106,6 +109,63 @@
     .fw-600 { font-weight: 600; }
     .fw-500 { font-weight: 500; }
     .fw-700 { font-weight: 700; }
+    /* Pastille commentaires non lus : pulsation + halo pour attirer l'œil */
+    .badge-unread-comments {
+      animation: badge-unread-pulse 1.5s ease-in-out infinite;
+      box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5);
+      font-weight: 700;
+      min-width: 1.5em;
+    }
+    @keyframes badge-unread-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5); }
+      50% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+    }
+    /* Fil de commentaires type messagerie */
+    .chat-thread { display: flex; flex-direction: column; gap: 0.75rem; }
+    .chat-row { display: flex; }
+    .chat-row-received { justify-content: flex-start; }
+    .chat-row-sent { justify-content: flex-end; }
+    .chat-bubble {
+      min-width: 55%;
+      max-width: 92%;
+      padding: 0.85rem 1.15rem;
+      border-radius: 1rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,.06);
+      word-wrap: break-word;
+    }
+    .chat-row-received .chat-bubble {
+      background: #f1f5f9;
+      color: #334155;
+      border-bottom-left-radius: 0.25rem;
+    }
+    .chat-row-sent .chat-bubble {
+      background: linear-gradient(135deg, var(--app-primary-light, #ccfbf1) 0%, rgba(20, 184, 166, 0.15) 100%);
+      color: #0f172a;
+      border: 1px solid rgba(20, 184, 166, 0.3);
+      border-bottom-right-radius: 0.25rem;
+    }
+    .chat-meta { font-size: 0.8rem; }
+    .chat-body:empty { display: none; }
+    /* Commentaires venant d'être marqués comme lus sur le détail du ticket */
+    .comment-newly-read {
+      border-left: 4px solid var(--app-primary, #14b8a6) !important;
+      background: linear-gradient(90deg, rgba(20, 184, 166, 0.08) 0%, transparent 100%) !important;
+      animation: comment-newly-read-fade 3s ease-out forwards;
+    }
+    .chat-row-received .chat-bubble.comment-newly-read {
+      background: linear-gradient(90deg, rgba(20, 184, 166, 0.18) 0%, #f1f5f9 100%) !important;
+    }
+    .comment-newly-read .badge-newly-read {
+      animation: badge-newly-read-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes comment-newly-read-fade {
+      0% { background: linear-gradient(90deg, rgba(20, 184, 166, 0.18) 0%, transparent 100%); }
+      100% { background: linear-gradient(90deg, rgba(20, 184, 166, 0.06) 0%, transparent 100%); }
+    }
+    @keyframes badge-newly-read-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.75; }
+    }
   </style>
 </head>
 <body class="d-flex flex-column min-vh-100">

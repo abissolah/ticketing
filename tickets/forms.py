@@ -22,6 +22,7 @@ class TicketForm(forms.ModelForm):
             "priority",
             "type",
             "status",
+            "archived",
             "assigned_to",
             "estimated_time",
             "actual_time",
@@ -33,6 +34,7 @@ class TicketForm(forms.ModelForm):
             "priority": forms.Select(attrs={"class": "form-select select2"}),
             "type": forms.Select(attrs={"class": "form-select select2"}),
             "status": forms.Select(attrs={"class": "form-select select2"}),
+            "archived": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "assigned_to": forms.Select(attrs={"class": "form-select select2"}),
             "estimated_time": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.01", "placeholder": "ex. 1,50"}),
             "actual_time": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0.01", "placeholder": "ex. 1,50"}),
@@ -53,6 +55,7 @@ class TicketForm(forms.ModelForm):
                 self.fields.pop("assigned_to", None)
                 self.fields.pop("estimated_time", None)
                 self.fields.pop("actual_time", None)
+                self.fields.pop("archived", None)
                 # Status: limit to few choices for client if we allow
                 if "status" in self.fields:
                     self.fields["status"].choices = [

@@ -8,6 +8,7 @@ from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -35,6 +36,8 @@ from .utils import (
     can_create_ticket,
     can_manage_clients_collaborateurs,
     get_clients_for_collaborateur,
+    get_ticket_unread_comment_count,
+    get_tickets_unread_counts,
 )
 
 
@@ -57,11 +60,11 @@ class TicketListView(LoginRequiredMixin, FilterView):
     context_object_name = "tickets"
 
     def get_queryset(self):
-        # Inclure les archivés si le filtre statut le demande
-        if "archived" in self.request.GET.getlist("status"):
-            qs = get_all_tickets_queryset(self.request.user)
-        else:
-            qs = get_visible_tickets_queryset(self.request.user)
+        qs = get_all_tickets_queryset(self.request.user)
+        # Par défaut : uniquement les tickets non archivés ; inclure les archivés si filtre "Archivés" est choisi
+        archived_param = self.request.GET.get("archived", "").lower()
+        if archived_param not in ("true", "1"):
+            qs = qs.filter(archived=False)
         qs = qs.select_related(
             "client", "member", "assigned_to", "assigned_to__user"
         )
@@ -113,6 +116,10 @@ class TicketListView(LoginRequiredMixin, FilterView):
             "client", "member", "assigned_to", "assigned_to__user"
         )
         ctx["archived_tickets"] = _order_tickets_priority_then_oldest(archived_qs)[:100]
+        # Nombre de commentaires non lus par ticket (pour la pastille)
+        tickets_on_page = ctx.get("tickets") or ctx.get("object_list") or []
+        ticket_ids = [t.id for t in tickets_on_page]
+        ctx["ticket_unread_counts"] = get_tickets_unread_counts(ticket_ids, self.request.user)
         return ctx
 
 
@@ -180,15 +187,49 @@ class TicketDetailView(LoginRequiredMixin, DetailView):
     context_object_name = "ticket"
 
     def get_queryset(self):
-        return get_visible_tickets_queryset(self.request.user)
+        return get_all_tickets_queryset(self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx["newly_read_comment_ids"] = self._mark_ticket_comments_as_read()
+        ticket = self.object
+        ctx["sent_comment_ids"] = set(
+            ticket.comments.filter(author_id=self.request.user.id).values_list("id", flat=True)
+        )
         ctx["comment_form"] = TicketCommentForm()
         ctx["priority_colors"] = {"low": "#198754", "medium": "#fd7e14", "high": "#dc3545"}
         ctx["can_edit"] = True
-        ctx["description_attachments"] = self.object.attachments.filter(comment__isnull=True)
+        ctx["description_attachments"] = ticket.attachments.filter(comment__isnull=True)
         return ctx
+
+    def _mark_ticket_comments_as_read(self):
+        """Marque comme lus les commentaires de l'autre camp ; retourne les IDs des commentaires nouvellement marqués (pour effet visuel)."""
+        from .models import CommentReadReceipt
+        from .utils import get_user_client, get_user_collaborateur, get_clients_for_collaborateur
+        user = self.request.user
+        ticket = self.object
+        newly_read = []
+        if not ticket.client:
+            return newly_read
+        client = get_user_client(user)
+        collab = get_user_collaborateur(user)
+        to_mark = []
+        for c in ticket.comments.all():
+            if not c.author_id:
+                continue
+            if client and ticket.client_id == client.id:
+                if c.author_id != user.id:
+                    from .models import Collaborateur
+                    if Collaborateur.objects.filter(user_id=c.author_id).exists():
+                        to_mark.append(c.id)
+            elif collab and ticket.client_id in set(get_clients_for_collaborateur(collab).values_list("id", flat=True)):
+                if ticket.client.user_id and c.author_id == ticket.client.user_id:
+                    to_mark.append(c.id)
+        for comment_id in to_mark:
+            _, created = CommentReadReceipt.objects.get_or_create(comment_id=comment_id, user=user)
+            if created:
+                newly_read.append(comment_id)
+        return newly_read
 
 
 class TicketCreateView(LoginRequiredMixin, CreateView):
@@ -247,6 +288,8 @@ class TicketUpdateView(LoginRequiredMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
+        if form.cleaned_data.get("status") == "validated":
+            form.instance.validated_at = timezone.now()
         response = super().form_valid(form)
         for f in self.request.FILES.getlist("attachments"):
             TicketAttachment.objects.create(
@@ -261,9 +304,9 @@ class TicketUpdateView(LoginRequiredMixin, UpdateView):
 def ticket_quick_update(request, pk):
     if not request.user.is_authenticated:
         return redirect("tickets:login")
-    """POST: update one field (status, priority, type, assigned_to, member)."""
+    """POST: update one field (status, priority, type, assigned_to, member, archived)."""
     ticket = get_object_or_404(Ticket, pk=pk)
-    qs = get_visible_tickets_queryset(request.user)
+    qs = get_all_tickets_queryset(request.user)
     if not qs.filter(pk=pk).exists():
         return redirect("tickets:home")
     field = request.POST.get("field")
@@ -271,6 +314,8 @@ def ticket_quick_update(request, pk):
     if field in ("status", "priority", "type") and value:
         if field == "status" and value in dict(STATUS_CHOICES):
             ticket.status = value
+            if value == "validated":
+                ticket.validated_at = timezone.now()
         elif field == "priority" and value in ("low", "medium", "high"):
             ticket.priority = value
         elif field == "type" and value in ("bug", "evol", "exploit"):
@@ -301,6 +346,13 @@ def ticket_quick_update(request, pk):
                 ticket.save()
         except (ValueError, TypeError):
             pass
+    elif field == "archived":
+        if str(value).lower() in ("true", "1", "yes"):
+            ticket.archived = True
+            ticket.save()
+        elif str(value).lower() in ("false", "0", "no"):
+            ticket.archived = False
+            ticket.save()
     return redirect(request.META.get("HTTP_REFERER", "tickets:home"))
 
 
@@ -367,12 +419,12 @@ class StatsView(LoginRequiredMixin, View):
 
         stats = {}
         if "open" in stats_choices:
-            stats["open"] = qs_all.exclude(status="archived").exclude(
+            stats["open"] = qs_all.exclude(
                 status__in=["validated", "cancelled"]
             ).count()
         if "closed" in stats_choices:
             stats["closed"] = qs_all.filter(
-                status__in=["validated", "archived", "cancelled"]
+                status__in=["validated", "cancelled"]
             ).count()
         if "by_status" in stats_choices:
             stats["by_status"] = list(
@@ -380,31 +432,30 @@ class StatsView(LoginRequiredMixin, View):
             )
         if "by_priority" in stats_choices:
             stats["by_priority"] = list(
-                qs_all.exclude(status="archived").values("priority").annotate(
+                qs_all.filter(archived=False).values("priority").annotate(
                     count=Count("id")
                 ).order_by("priority")
             )
         if "by_assigned" in stats_choices and collab:
             stats["by_assigned"] = list(
-                qs_all.exclude(status="archived")
+                qs_all.filter(archived=False)
                 .filter(assigned_to__isnull=False)
                 .values("assigned_to__first_name", "assigned_to__last_name")
                 .annotate(count=Count("id"))
             )
         if "by_type" in stats_choices:
             stats["by_type"] = list(
-                qs_all.exclude(status="archived").values("type").annotate(
+                qs_all.filter(archived=False).values("type").annotate(
                     count=Count("id")
                 ).order_by("type")
             )
-        # Par membre (pour les clients) : ouvert / fermé par membre, avec liens vers la liste
+        # Par membre (pour les clients) : ouvert / fermé par membre (validé ou annulé = fermé)
         if "by_member" in stats_choices and client:
             members = list(
                 client.members.order_by("last_name", "first_name")
             )
             by_member = []
-            open_statuses = ["created", "assigned", "in_progress", "delivered_preprod", "delivered_prod"]
-            closed_statuses = ["validated", "archived", "cancelled"]
+            closed_statuses = ["validated", "cancelled"]
             for m in members:
                 open_count = qs_all.filter(member=m).exclude(
                     status__in=closed_statuses
