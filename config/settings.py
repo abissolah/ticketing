@@ -140,3 +140,13 @@ EMAIL_IMAP_MAILBOX = os.environ.get("EMAIL_IMAP_MAILBOX", "INBOX")
 EMAIL_IMAP_USE_SSL = os.environ.get("EMAIL_IMAP_USE_SSL", "true").lower() in ("true", "1", "yes")
 # Webhook (Mailgun / SendGrid) — secret pour authentifier les POST
 EMAIL_WEBHOOK_SECRET = os.environ.get("EMAIL_WEBHOOK_SECRET", "")
+
+# Envoi d'e-mails (notifications client : commentaires, statut)
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Ticketing <noreply@example.com>")
+# Optionnel : SMTP (si non défini, Django utilise le backend console en dev)
+if os.environ.get("EMAIL_HOST"):
+    EMAIL_HOST = os.environ.get("EMAIL_HOST")
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() in ("true", "1", "yes")
+    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")

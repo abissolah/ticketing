@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login as auth_login, logout as auth_logout
@@ -39,6 +41,7 @@ from .utils import (
     get_ticket_unread_comment_count,
     get_tickets_unread_counts,
 )
+from .notifications import notify_client_new_comment, notify_client_status_changed
 
 
 class LoginView(BaseLoginView):
@@ -287,6 +290,19 @@ class TicketUpdateView(LoginRequiredMixin, UpdateView):
         kwargs["collaborateur"] = get_user_collaborateur(self.request.user)
         return kwargs
 
+    def form_invalid(self, form):
+        logger.warning(
+            "Formulaire ticket invalide (pk=%s, user=%s) : %s",
+            self.object.pk if self.object else None,
+            self.request.user,
+            form.errors,
+        )
+        messages.error(
+            self.request,
+            "Le formulaire contient des erreurs. Veuillez les corriger.",
+        )
+        return super().form_invalid(form)
+
     def form_valid(self, form):
         if form.cleaned_data.get("status") == "validated":
             form.instance.validated_at = timezone.now()
@@ -295,6 +311,9 @@ class TicketUpdateView(LoginRequiredMixin, UpdateView):
             TicketAttachment.objects.create(
                 ticket=self.object, comment=None, file=f, name=f.name or "piece_jointe"
             )
+        new_status = form.cleaned_data.get("status")
+        if new_status in ("delivered_prod", "validated") and get_user_collaborateur(self.request.user):
+            notify_client_status_changed(self.object, new_status, request=self.request)
         return response
 
     def get_success_url(self):
@@ -316,11 +335,15 @@ def ticket_quick_update(request, pk):
             ticket.status = value
             if value == "validated":
                 ticket.validated_at = timezone.now()
+            ticket.save()
+            if value in ("delivered_prod", "validated") and get_user_collaborateur(request.user):
+                notify_client_status_changed(ticket, value, request=request)
         elif field == "priority" and value in ("low", "medium", "high"):
             ticket.priority = value
         elif field == "type" and value in ("bug", "evol", "exploit"):
             ticket.type = value
-        ticket.save()
+        if field != "status":
+            ticket.save()
     elif field == "assigned_to" and get_user_collaborateur(request.user):
         from .models import Collaborateur
         if value == "" or value is None:
@@ -356,6 +379,9 @@ def ticket_quick_update(request, pk):
     return redirect(request.META.get("HTTP_REFERER", "tickets:home"))
 
 
+logger = logging.getLogger(__name__)
+
+
 def ticket_add_comment(request, pk):
     if not request.user.is_authenticated:
         return redirect("tickets:login")
@@ -364,15 +390,31 @@ def ticket_add_comment(request, pk):
         return redirect("tickets:home")
     form = TicketCommentForm(request.POST)
     if form.is_valid():
-        comment = form.save(commit=False)
-        comment.ticket = ticket
-        comment.author = request.user
-        comment.save()
-        for f in request.FILES.getlist("attachments"):
-            TicketAttachment.objects.create(
-                ticket=ticket, comment=comment, file=f, name=f.name
+        try:
+            comment = form.save(commit=False)
+            comment.ticket = ticket
+            comment.author = request.user
+            comment.save()
+            for f in request.FILES.getlist("attachments"):
+                name = (getattr(f, "name", None) or "").strip() or "piece_jointe"
+                TicketAttachment.objects.create(
+                    ticket=ticket, comment=comment, file=f, name=name
+                )
+            messages.success(request, "Commentaire ajouté.")
+            if get_user_collaborateur(request.user):
+                notify_client_new_comment(ticket, comment, request=request)
+        except Exception as e:
+            logger.exception(
+                "Erreur lors de l'ajout d'un commentaire (ticket pk=%s, user=%s): %s",
+                pk,
+                request.user,
+                e,
             )
-        messages.success(request, "Commentaire ajouté.")
+            messages.error(
+                request,
+                "Une erreur s'est produite lors de l'enregistrement du commentaire ou des pièces jointes. "
+                "Vérifiez que le répertoire media est accessible en écriture (voir les logs serveur).",
+            )
     else:
         messages.error(request, "Erreur dans le formulaire.")
     return redirect("tickets:detail", pk=pk)

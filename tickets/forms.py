@@ -66,6 +66,12 @@ class TicketForm(forms.ModelForm):
             self.fields["assigned_to"].queryset = Collaborateur.objects.filter(
                 prestataire=self.collaborateur.prestataire
             ).order_by("last_name", "first_name")
+            # En édition : limiter les membres à ceux du client du ticket
+            if self.instance and self.instance.pk and getattr(self.instance, "client_id", None):
+                self.fields["member"].queryset = ClientMember.objects.filter(
+                    client_id=self.instance.client_id
+                ).order_by("last_name", "first_name")
+            self.fields["member"].required = False
 
 
 class TicketCreateForm(forms.ModelForm):

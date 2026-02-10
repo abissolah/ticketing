@@ -22,6 +22,16 @@
     {% if form.non_field_errors %}
       <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
     {% endif %}
+    {% if form.errors %}
+      <div class="alert alert-warning rounded-3 mb-3">
+        <strong>Erreurs dans le formulaire :</strong>
+        <ul class="mb-0 mt-1">
+          {% for field in form %}
+            {% for error in field.errors %}<li><strong>{{ field.label }}</strong> : {{ error }}</li>{% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
     <div class="row">
       <div class="col-md-8">
         <div class="mb-3">
