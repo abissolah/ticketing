@@ -71,7 +71,7 @@ class TicketListView(LoginRequiredMixin, FilterView):
         qs = qs.select_related(
             "client", "member", "assigned_to", "assigned_to__user"
         )
-        return _order_tickets_priority_then_oldest(qs)
+        return qs.order_by("-created_at")
 
     def get_filterset_kwargs(self, filterset_class):
         kwargs = super().get_filterset_kwargs(filterset_class)
@@ -118,7 +118,7 @@ class TicketListView(LoginRequiredMixin, FilterView):
         archived_qs = archived_qs.select_related(
             "client", "member", "assigned_to", "assigned_to__user"
         )
-        ctx["archived_tickets"] = _order_tickets_priority_then_oldest(archived_qs)[:100]
+        ctx["archived_tickets"] = archived_qs.order_by("-created_at")[:100]
         # Nombre de commentaires non lus par ticket (pour la pastille)
         tickets_on_page = ctx.get("tickets") or ctx.get("object_list") or []
         ticket_ids = [t.id for t in tickets_on_page]

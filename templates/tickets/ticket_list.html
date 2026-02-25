@@ -3,7 +3,33 @@
 
 {% block title %}Tickets{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Liste tickets : style moderne */
+  .tickets-list-page .table-responsive { border-radius: 14px; border: 1px solid rgba(0,0,0,.06); background: #fff; }
+  .tickets-list-page .ticket-table { border: none; }
+  .tickets-list-page .ticket-table thead th { border: none; border-bottom: 1px solid #e2e8f0; padding: 1rem 1.25rem; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b; background: #fafbfc; }
+  .tickets-list-page .ticket-table tbody tr { transition: background .15s ease; }
+  .tickets-list-page .ticket-table tbody tr:hover { background: rgba(20, 184, 166, .04) !important; }
+  .tickets-list-page .ticket-table tbody tr.ticket-row-validated:hover { background: rgba(25, 135, 84, .06) !important; }
+  .tickets-list-page .ticket-table tbody td { border: none; border-bottom: 1px solid #f1f5f9; padding: 1rem 1.25rem; vertical-align: middle; }
+  .tickets-list-page .ticket-table tbody tr:last-child td { border-bottom: none; }
+  .tickets-list-page .ticket-table .form-select-sm { border-radius: 8px; border-color: #e2e8f0; font-size: .875rem; padding: .35rem .6rem; }
+  .tickets-list-page .ticket-table .form-select-sm:focus { border-color: var(--app-primary); box-shadow: 0 0 0 3px rgba(20, 184, 166, .15); }
+  .tickets-list-page .ticket-table a.text-dark.fw-500 { font-weight: 600; transition: color .15s; }
+  .tickets-list-page .ticket-table a.text-dark.fw-500:hover { color: var(--app-primary) !important; }
+  .tickets-list-page .tile-card { border-radius: 14px; border: 1px solid rgba(0,0,0,.06); border-left-width: 4px !important; transition: border-color .2s, box-shadow .2s; }
+  .tickets-list-page .tile-card:hover { box-shadow: 0 8px 30px -8px rgba(0,0,0,.12); border-left-width: 4px !important; }
+  .tickets-list-page .tile-card .card-body { padding: 1.25rem 1.5rem; }
+  .tickets-list-page .tile-card .card-title a { font-weight: 600; transition: color .15s; }
+  .tickets-list-page .tile-card .card-title a:hover { color: var(--app-primary) !important; }
+  .tickets-list-page .tile-card .badge { font-weight: 500; font-size: .7rem; padding: .35em .65em; }
+  .tickets-list-page .btn-group .btn { border-radius: 10px !important; }
+</style>
+{% endblock %}
+
 {% block content %}
+  <div class="tickets-list-page">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <h1 class="page-header mb-0 d-flex align-items-center gap-2">
       <i class="bi bi-list-task text-primary"></i>
@@ -85,25 +111,28 @@
   </div>
 
   {% if view_mode == 'table' %}
-  <div class="table-responsive rounded-3 overflow-hidden shadow-sm">
-    <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
+  <div class="table-responsive overflow-hidden">
+    <table class="table table-hover align-middle mb-0 ticket-table">
+      <thead>
         <tr>
-          <th class="border-0 py-3 ps-4"><span class="text-muted fw-600">Titre</span></th>
-          <th class="border-0 py-3"><span class="text-muted fw-600">Date</span></th>
-          <th class="border-0 py-3"><span class="text-muted fw-600">Membre</span></th>
-          <th class="border-0 py-3"><span class="text-muted fw-600">Priorité</span></th>
-          <th class="border-0 py-3"><span class="text-muted fw-600">Statut</span></th>
-          <th class="border-0 py-3"><span class="text-muted fw-600">Type</span></th>
-          <th class="border-0 py-3"><span class="text-muted fw-600">Affecté à</span></th>
-          <th class="border-0 py-3 pe-4 text-end" style="width: 100px;"><span class="text-muted fw-600">Actions</span></th>
+          <th class="ps-4">Titre</th>
+          <th>Date</th>
+          <th>Membre</th>
+          <th>Priorité</th>
+          <th>Statut</th>
+          <th>Type</th>
+          <th>Affecté à</th>
+          <th class="pe-4 text-end" style="width: 100px;">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for ticket in tickets %}
         <tr class="{% if ticket.is_validated %}ticket-row-validated{% endif %}">
           <td style="background-color: {{ ticket.member_color_bg }} !important;" class="ps-4">
-            <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark fw-500 text-decoration-none">{{ ticket.title }}</a>
+            <span class="ticket-title-popover" data-ticket-id="{{ ticket.pk }}" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="auto" data-bs-title="Description" tabindex="0">
+              <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark fw-500 text-decoration-none">{{ ticket.title }}</a>
+            </span>
+            <div class="d-none ticket-desc-content" id="ticket-desc-{{ ticket.pk }}"><div class="popover-description-body">{% if ticket.description %}{{ ticket.description|safe }}{% else %}<span class="text-muted">Aucune description.</span>{% endif %}</div></div>
             {% if ticket.is_validated and ticket.validated_at %}<span class="badge rounded-pill bg-success ms-1" title="Date de validation"><i class="bi bi-check-circle-fill me-1"></i>Validé le {{ ticket.validated_at|date:"d/m/Y" }}</span>{% endif %}
             {% with unread=ticket_unread_counts|get_item:ticket.id %}
             {% if unread %}<span class="badge rounded-pill bg-danger ms-1 badge-unread-comments" title="Commentaires non lus">{{ unread }}</span>{% endif %}
@@ -182,19 +211,22 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="text-center text-muted py-4">Aucun ticket.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-5">Aucun ticket.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-  <div class="row g-3">
+  <div class="row g-4">
     {% for ticket in tickets %}
     <div class="col-12 col-sm-6 col-lg-4">
       <div class="card card-app tile-card h-100 {% if ticket.is_validated %}ticket-row-validated{% endif %}" style="border-left: 4px solid {{ ticket.member_color }} !important;">
         <div class="card-body p-4">
           <h5 class="card-title h6 fw-600 mb-2">
-            <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark text-decoration-none">{{ ticket.title }}</a>
+            <span class="ticket-title-popover" data-ticket-id="{{ ticket.pk }}" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="auto" data-bs-title="Description" tabindex="0">
+              <a href="{% url 'tickets:detail' ticket.pk %}" class="text-dark text-decoration-none">{{ ticket.title }}</a>
+            </span>
+            <div class="d-none ticket-desc-content" id="ticket-desc-{{ ticket.pk }}"><div class="popover-description-body">{% if ticket.description %}{{ ticket.description|safe }}{% else %}<span class="text-muted">Aucune description.</span>{% endif %}</div></div>
             {% with unread=ticket_unread_counts|get_item:ticket.id %}
             {% if unread %}<span class="badge rounded-pill bg-danger ms-1 badge-unread-comments" title="Commentaires non lus">{{ unread }}</span>{% endif %}
             {% endwith %}
@@ -224,6 +256,7 @@
   </div>
   {% endif %}
 
+  </div>
   {% if page_obj.paginator.num_pages > 1 %}
   <nav class="mt-4">
     <ul class="pagination justify-content-center">
@@ -298,6 +331,22 @@
     $('.form-select').addClass('form-control');
     $('select.select2').select2({ theme: 'bootstrap-5', width: '100%' });
     $('select.select2-multi').select2({ theme: 'bootstrap-5', width: '100%' });
+
+    // Popover description au survol du titre (contenu HTML)
+    document.querySelectorAll('.ticket-title-popover').forEach(function (el) {
+      var id = el.getAttribute('data-ticket-id');
+      var contentEl = document.getElementById('ticket-desc-' + id);
+      if (contentEl) {
+        new bootstrap.Popover(el, {
+          content: contentEl.innerHTML,
+          title: 'Description',
+          trigger: 'hover',
+          placement: 'auto',
+          html: true,
+          container: 'body'
+        });
+      }
+    });
   });
 </script>
 {% endblock %}
